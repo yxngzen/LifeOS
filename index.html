@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>LifeOS</title>
+  <meta name="theme-color" content="#15171A" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LifeOS" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <main id="screen"></main>
+    <nav class="tabbar">
+      <button data-tab="today" class="tab active">🌳<span>Heute</span></button>
+      <button data-tab="goals" class="tab">🎯<span>Ziele</span></button>
+      <button data-tab="money" class="tab">💰<span>Finanzen</span></button>
+      <button data-tab="journey" class="tab">📖<span>Reise</span></button>
+    </nav>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

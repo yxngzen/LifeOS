@@ -1,0 +1,56 @@
+const STORAGE='lifeos-v1';
+const todayKey=()=>new Date().toISOString().slice(0,10);
+const defaultState={
+  plantedAt: todayKey(), monthlyBudget: 1000,
+  goals:[{id:crypto.randomUUID(),title:'Sport (45 Min)',category:'Gesundheit',recurring:true,completedDates:[],focusDate:todayKey()},{id:crypto.randomUUID(),title:'Lesen',category:'Lernen',recurring:true,completedDates:[]},{id:crypto.randomUUID(),title:'Wohnung aufräumen',category:'Haushalt',recurring:false,completedDates:[]}],
+  expenses:[], milestones:[]
+};
+let state=load(); let currentTab='today';
+function load(){try{return JSON.parse(localStorage.getItem(STORAGE))||defaultState}catch{return defaultState}}
+function save(){localStorage.setItem(STORAGE,JSON.stringify(state))}
+function euro(n){return (n||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'})}
+function daysSince(date){return Math.max(1,Math.floor((new Date(todayKey())-new Date(date))/(864e5))+1)}
+function activeGoals(){return state.goals.slice(0,5)}
+function isDone(g){return g.completedDates?.includes(todayKey())}
+function focusGoal(){return activeGoals().find(g=>g.focusDate===todayKey())||activeGoals()[0]}
+function spentThisMonth(){const m=todayKey().slice(0,7);return state.expenses.filter(e=>e.date?.startsWith(m)).reduce((s,e)=>s+Number(e.amount),0)}
+function spentToday(){return state.expenses.filter(e=>e.date===todayKey()).reduce((s,e)=>s+Number(e.amount),0)}
+function daysInMonth(){const d=new Date();return new Date(d.getFullYear(),d.getMonth()+1,0).getDate()}
+function dayOfMonth(){return new Date().getDate()}
+function availableToday(){const remaining=state.monthlyBudget-spentThisMonth(); const daysLeft=Math.max(1,daysInMonth()-dayOfMonth()+1); return remaining/daysLeft}
+function completionRate(){const goals=activeGoals(); return goals.length? goals.filter(isDone).length/goals.length:0}
+function momentum(){const rate=completionRate(); const avail=availableToday(); if(rate>=.6 && avail>=0)return 'Stark'; if(rate>=.25 || avail>=0)return 'Stabil'; return 'Aufmerksamkeit nötig'}
+function treeEmoji(){const age=daysSince(state.plantedAt); if(age<8)return '🌱'; if(age<31)return '🌿'; if(age<150)return '🌳'; return '🌲'}
+function render(){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===currentTab)); const screen=document.getElementById('screen'); screen.innerHTML = views[currentTab](); bind();}
+function header(title, sub){return `<header><div class="hello">${title}</div><div class="sub">${sub}</div></header>`}
+const views={
+ today(){const fg=focusGoal(); const done=activeGoals().filter(isDone).length; const total=activeGoals().length; const pct=total?Math.round(done/total*100):0; return `${header('Guten Morgen, Julius 👋','Kümmere dich heute um deinen Baum.')}
+ <section class="card tree-card"><div class="tree">${treeEmoji()}</div><div class="momentum">🔥 Momentum: ${momentum()}</div><div class="sub" style="margin-top:10px">${daysSince(state.plantedAt)} Tage alt</div></section>
+ <div class="metric-row"><div class="metric"><div class="metric-title">🎯 Ziele</div><div class="metric-value">${done}/${total}</div><div class="progress"><div class="bar" style="width:${pct}%"></div></div></div><div class="metric"><div class="metric-title">💰 Heute verfügbar</div><div class="metric-value">${euro(availableToday())}</div></div></div>
+ <section class="card focus"><div class="section-title">🔥 Fokus heute</div><div style="font-size:20px;font-weight:800;margin:8px 0">${fg?fg.title:'Kein Fokusziel'}</div><button class="primary" data-complete="${fg?.id||''}">Gedrückt halten zum Erledigen</button></section>
+ <section class="card"><div class="section-title">🌿 Tagesimpuls</div><div class="insight">Noch ein Ziel bis zum nächsten Wachstumsschub.</div><button class="secondary" data-add-expense>➕ Ausgabe erfassen</button></section>`},
+ goals(){return `${header('🎯 Ziele','Heute entscheidet, was morgen wächst.')}
+ <section class="card focus"><div class="section-title">🔥 Fokus heute</div>${goalRows([focusGoal()],true)}</section>
+ <section class="card"><div class="section-title">Heute</div><div class="list">${goalRows(activeGoals())}</div><button class="primary" data-add-goal>➕ Neues Ziel</button></section>
+ <section class="card"><div class="section-title">🔁 Wiederkehrend</div><div class="list">${goalRows(state.goals.filter(g=>g.recurring))}</div></section>`},
+ money(){const spent=spentThisMonth(); const pct=Math.min(100,Math.round(spent/state.monthlyBudget*100)); return `${header('💰 Finanzen','Bewusstsein statt Kontrolle.')}
+ <section class="card"><div class="metric-title">Heute verfügbar</div><div class="metric-value" style="font-size:42px">${euro(availableToday())}</div><div class="sub">Heute ausgegeben: ${euro(spentToday())}</div></section>
+ <section class="card"><div class="section-title">Monatsbudget</div><div class="metric-value">${euro(spent)} / ${euro(state.monthlyBudget)}</div><div class="progress"><div class="bar" style="width:${pct}%"></div></div><div class="sub" style="margin-top:10px">${availableToday()>=0?'🟢 Auf Kurs':'🔴 Aufmerksamkeit nötig'}</div><button class="secondary" data-budget>Budget ändern</button></section>
+ <button class="primary" data-add-expense>➕ Ausgabe erfassen</button>
+ <section class="card"><div class="section-title">Letzte Ausgaben</div><div class="list">${expenseRows()}</div></section>`},
+ journey(){const age=daysSince(state.plantedAt), done=state.goals.reduce((s,g)=>s+(g.completedDates?.length||0),0), spontaneous=state.expenses.filter(e=>!e.planned).length; return `${header('📖 Deine Reise',`Tag ${age}`)}
+ <section class="card tree-card"><div class="tree">${treeEmoji()}</div><div class="section-title">Dein Lebensbaum</div><div class="sub">Gepflanzt am ${new Date(state.plantedAt).toLocaleDateString('de-DE')}</div></section>
+ <section class="card"><div class="section-title">Meilensteine</div><div class="list"><div class="item"><span>🌱 Baum gepflanzt</span><span>Tag 1</span></div><div class="item"><span>🌿 Erste Routine</span><span>Tag 7</span></div><div class="item"><span>🐦 Erster Vogel</span><span>kommt bald</span></div></div></section>
+ <section class="card"><div class="section-title">Erkenntnisse</div><p class="insight">🎯 ${done} Ziele wurden bisher abgeschlossen.</p><p class="insight">💰 ${spontaneous} spontane Ausgaben wurden erfasst.</p><p class="insight">🔥 Dein Momentum ist aktuell: ${momentum()}.</p></section>`}
+};
+function goalRows(goals, single=false){if(!goals||!goals[0])return '<div class="empty">Noch kein Ziel.</div>'; return goals.map(g=>`<div class="item ${isDone(g)?'done':''}"><div class="item-left"><button class="circle" data-complete="${g.id}">${isDone(g)?'✓':''}</button><span>${g.title}</span></div><button class="secondary" data-focus="${g.id}">Fokus</button></div>`).join('')}
+function expenseRows(){return state.expenses.slice(-5).reverse().map(e=>`<div class="item"><span>${catIcon(e.category)} ${e.note||e.category}</span><span>${euro(e.amount)}</span></div>`).join('')||'<div class="empty">Noch keine Ausgaben.</div>'}
+function catIcon(c){return {Essen:'🍔',Alkohol:'🍺',Einkaufen:'🛒',Freizeit:'🎮',Mobilität:'🚗',Online:'📦',Abos:'📱'}[c]||'💰'}
+function bind(){document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{currentTab=b.dataset.tab;render()}); document.querySelectorAll('[data-complete]').forEach(b=>b.onpointerdown=()=>{const id=b.dataset.complete; if(!id)return; completeGoal(id)}); document.querySelectorAll('[data-focus]').forEach(b=>b.onclick=()=>{state.goals.forEach(g=>{if(g.id===b.dataset.focus)g.focusDate=todayKey()});save();render()}); document.querySelectorAll('[data-add-goal]').forEach(b=>b.onclick=showGoalSheet); document.querySelectorAll('[data-add-expense]').forEach(b=>b.onclick=showExpenseSheet); document.querySelectorAll('[data-budget]').forEach(b=>b.onclick=showBudgetSheet)}
+function completeGoal(id){const g=state.goals.find(x=>x.id===id); if(!g)return; g.completedDates=g.completedDates||[]; if(!g.completedDates.includes(todayKey())){g.completedDates.push(todayKey()); toast('🌿 Ein neuer Trieb ist gewachsen.')} save(); render()}
+function toast(msg){const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),1600)}
+function sheet(html){const m=document.createElement('div'); m.className='modal'; m.innerHTML=`<div class="sheet">${html}<button class="secondary" style="width:100%;margin-top:10px" data-close>Schließen</button></div>`; document.body.appendChild(m); m.querySelector('[data-close]').onclick=()=>m.remove(); return m}
+function showGoalSheet(){const m=sheet(`<h2>Neues Ziel</h2><input class="input" id="goalTitle" placeholder="z.B. Sport"/><div class="chips" id="goalCats">${['Gesundheit','Lernen','Arbeit','Haushalt','Finanzen','Sonstiges'].map((c,i)=>`<button class="chip ${i==0?'active':''}" data-cat="${c}">${c}</button>`).join('')}</div><label><input type="checkbox" id="rec"/> Wiederkehrend</label><button class="primary" id="saveGoal">Speichern</button>`); let cat='Gesundheit'; m.querySelectorAll('[data-cat]').forEach(c=>c.onclick=()=>{cat=c.dataset.cat;m.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active')}); m.querySelector('#saveGoal').onclick=()=>{const title=m.querySelector('#goalTitle').value.trim(); if(!title)return; if(activeGoals().length>=5){toast('Maximal 5 Tagesziele.');return} state.goals.push({id:crypto.randomUUID(),title,category:cat,recurring:m.querySelector('#rec').checked,completedDates:[]});save();m.remove();render()}}
+function showExpenseSheet(){const cats=['Essen','Alkohol','Einkaufen','Freizeit','Mobilität','Online','Abos']; const m=sheet(`<h2>Ausgabe erfassen</h2><input class="input" id="amount" type="number" step="0.01" placeholder="Betrag"/><div class="chips" id="cats">${cats.map((c,i)=>`<button class="chip ${i==0?'active':''}" data-cat="${c}">${catIcon(c)} ${c}</button>`).join('')}</div><div class="chips"><button class="chip active" data-planned="true">Geplant</button><button class="chip" data-planned="false">Spontan</button></div><input class="input" id="note" placeholder="Notiz optional"/><button class="primary" id="saveExpense">Speichern</button>`); let cat='Essen', planned=true; m.querySelectorAll('#cats [data-cat]').forEach(c=>c.onclick=()=>{cat=c.dataset.cat;m.querySelectorAll('#cats .chip').forEach(x=>x.classList.remove('active'));c.classList.add('active')}); m.querySelectorAll('[data-planned]').forEach(p=>p.onclick=()=>{planned=p.dataset.planned==='true';m.querySelectorAll('[data-planned]').forEach(x=>x.classList.remove('active'));p.classList.add('active')}); m.querySelector('#saveExpense').onclick=()=>{const amount=parseFloat(m.querySelector('#amount').value); if(!amount)return; state.expenses.push({id:crypto.randomUUID(),amount,category:cat,planned,note:m.querySelector('#note').value.trim(),date:todayKey()});save();m.remove();toast('🍃 Dein Baum hat neue Blätter bekommen.');render()}}
+function showBudgetSheet(){const m=sheet(`<h2>Monatsbudget</h2><input class="input" id="budget" type="number" value="${state.monthlyBudget}"/><button class="primary" id="saveBudget">Speichern</button>`); m.querySelector('#saveBudget').onclick=()=>{state.monthlyBudget=parseFloat(m.querySelector('#budget').value)||state.monthlyBudget;save();m.remove();render()}}
+render();
