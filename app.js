@@ -1,127 +1,409 @@
-const STORAGE = {
-  goals: 'lifeos_v11_goals',
-  expenses: 'lifeos_v11_expenses',
-  budget: 'lifeos_v11_budget',
-  reflections: 'lifeos_v11_reflections',
-  plantedAt: 'lifeos_v11_planted_at'
+const $ = (q) => document.querySelector(q);
+
+const storeKey = "lifeos_v02";
+const areas = [
+  { id:"relationships", icon:"❤️", name:"Beziehungen" },
+  { id:"health", icon:"🏃", name:"Gesundheit" },
+  { id:"career", icon:"💼", name:"Karriere" },
+  { id:"finance", icon:"💰", name:"Finanzen" },
+  { id:"growth", icon:"🧠", name:"Entwicklung" }
+];
+
+const defaultState = {
+  createdAt: new Date().toISOString(),
+  activeTab: "today",
+  chapter: null,
+  money: { monthlyBudget: 1000, expenses: [] },
+  reflections: [],
+  insights: [],
+  planted: false
 };
 
-const AREAS = {
-  health: '🏃 Gesundheit',
-  career: '💼 Karriere',
-  finance: '💰 Finanzen',
-  relationships: '❤️ Beziehungen',
-  growth: '🧠 Entwicklung'
-};
-const CATEGORIES = {
-  food: '🍔 Essen', alcohol: '🍺 Alkohol', grocery: '🛒 Einkauf', fun: '🎮 Freizeit', mobility: '🚗 Mobilität', online: '📦 Online', subs: '📱 Abos'
-};
+let state = load();
 
-let state = {
-  tab: 'today',
-  goals: load(STORAGE.goals, []),
-  expenses: load(STORAGE.expenses, []),
-  budget: Number(localStorage.getItem(STORAGE.budget) || 1000),
-  reflections: load(STORAGE.reflections, []),
-  plannedExpense: false,
-  goalType: 'daily'
-};
-if (!localStorage.getItem(STORAGE.plantedAt)) localStorage.setItem(STORAGE.plantedAt, new Date().toISOString());
-
-function load(key, fallback){ try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; } }
-function save(){
-  localStorage.setItem(STORAGE.goals, JSON.stringify(state.goals));
-  localStorage.setItem(STORAGE.expenses, JSON.stringify(state.expenses));
-  localStorage.setItem(STORAGE.budget, String(state.budget));
-  localStorage.setItem(STORAGE.reflections, JSON.stringify(state.reflections));
+function load(){
+  try { return { ...defaultState, ...(JSON.parse(localStorage.getItem(storeKey)) || {}) }; }
+  catch { return structuredClone(defaultState); }
 }
-function todayISO(){ return new Date().toISOString().slice(0,10); }
-function fmtEUR(n){ return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n); }
-function escapeHtml(s=''){ return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
-function daysActive(){ return Math.max(1, Math.floor((new Date() - new Date(localStorage.getItem(STORAGE.plantedAt))) / 86400000) + 1); }
-function todayGoals(){ return state.goals.filter(g => g.type === 'daily'); }
-function completedTodayGoals(){ return todayGoals().filter(g => g.completedDate === todayISO()); }
-function focusGoal(){ return todayGoals().find(g => g.isFocus); }
-function todayExpenses(){ return state.expenses.filter(e => e.createdAt.slice(0,10) === todayISO()); }
-function monthExpenses(){ const ym = todayISO().slice(0,7); return state.expenses.filter(e => e.createdAt.slice(0,7) === ym); }
-function spentToday(){ return todayExpenses().reduce((s,e)=>s+Number(e.amount),0); }
-function spentMonth(){ return monthExpenses().reduce((s,e)=>s+Number(e.amount),0); }
-function dailyBudget(){ const now = new Date(); const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate(); return state.budget / daysInMonth; }
-function availableToday(){ return dailyBudget() - spentToday(); }
-function treeStage(){ const d = daysActive(); if (d < 7) return ['🌱','Samen']; if (d < 30) return ['🌿','Sprössling']; if (d < 365) return ['🌳','Junger Baum']; return ['🌲','Lebensbaum']; }
-function courseText(){
-  const goals = todayGoals(); const done = completedTodayGoals().length; const goalRate = goals.length ? done/goals.length : .5;
-  const budgetOK = spentMonth() <= state.budget;
-  if (goalRate >= .6 && budgetOK) return ['🌿 Du bist auf Kurs.','📈 Deine Entwicklung zeigt nach oben.'];
-  if (goalRate >= .3 || budgetOK) return ['🌤 Du bleibst stabil.','Kleine Schritte reichen aus.'];
-  return ['🌧 Etwas aus dem Tritt.','🌱 Heute reicht ein neuer Anfang.'];
+function save(){ localStorage.setItem(storeKey, JSON.stringify(state)); }
+
+function daysSince(date){
+  return Math.max(1, Math.ceil((Date.now() - new Date(date).getTime()) / 86400000));
 }
-function nextStep(){ const fg = focusGoal(); if (!fg) return 'Fokusziel auswählen'; if (fg.completedDate !== todayISO()) return `${fg.title} erledigen`; if (todayExpenses().length === 0) return 'Erste Ausgabe erfassen'; return 'Tag bewusst weiterführen'; }
-function insight(){
-  if (state.expenses.length >= 5) {
-    const spontaneous = state.expenses.filter(e=>!e.planned).length;
-    const p = Math.round(spontaneous/state.expenses.length*100);
-    return `${p}% deiner Ausgaben waren spontan.`;
+function euro(n){ return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR"}).format(n || 0); }
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+
+function timePhase(){
+  const h = new Date().getHours();
+  if(h >= 5 && h < 11) return "morning";
+  if(h >= 11 && h < 18) return "day";
+  if(h >= 18 || h < 2) return "evening";
+  return "night";
+}
+
+function spentThisMonth(){
+  const ym = new Date().toISOString().slice(0,7);
+  return state.money.expenses
+    .filter(e => (e.date || "").startsWith(ym))
+    .reduce((s,e)=>s+Number(e.amount||0),0);
+}
+
+function todayImportant(){
+  const last = state.reflections.slice(-7);
+  if(!state.planted) return "Pflanze deinen Lebensbaum und beginne deine Reise.";
+  if(!state.chapter) return "Wähle ein Kapitel, das in den nächsten Wochen Aufmerksamkeit verdient.";
+  if(last.length < 3) return "Ein paar kurze Abendreflexionen reichen, damit LifeOS erste Muster erkennt.";
+  const counts = {};
+  last.flatMap(r=>r.areas||[]).forEach(a => counts[a]=(counts[a]||0)+1);
+  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+  if(top){
+    const area = areas.find(a=>a.id===top[0]);
+    return `${area.icon} ${area.name} war zuletzt häufig präsent.`;
   }
-  if (state.goals.length >= 3) return 'Deine ersten Muster entstehen gerade.';
-  return 'Plane heute wenige, aber klare Schritte.';
+  return "Heute reicht ein kleiner bewusster Schritt.";
 }
-function milestones(){
-  const d = daysActive();
-  return [
-    {days:1, icon:'🌱', title:'Baum gepflanzt'}, {days:7, icon:'🐦', title:'Erster Vogel'}, {days:30, icon:'🌸', title:'Erste Blüte'}, {days:100, icon:'🌿', title:'Großer Ast'}, {days:365, icon:'🌲', title:'Ein Jahr Wachstum'}
-  ].filter(m=>d>=m.days);
+
+function statusLine(){
+  const refs = state.reflections.length;
+  if(refs === 0) return "🌱 Heute beginnt dein Lebensbaum.";
+  if(refs < 5) return "🌿 Du baust erste Struktur auf.";
+  const good = state.reflections.slice(-7).filter(r=>r.mood==="good").length;
+  if(good >= 4) return "🌿 Du bist auf Kurs.";
+  return "🌱 Kleine Schritte reichen aus.";
+}
+
+function switchTab(tab){
+  state.activeTab = tab;
+  save();
+  render();
 }
 
 function render(){
-  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.dataset.tab === state.tab));
-  const app = document.getElementById('app');
-  app.innerHTML = ({today: renderToday, goals: renderGoals, finance: renderFinance, journey: renderJourney})[state.tab]();
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active", b.dataset.tab===state.activeTab));
+  const view = $("#view");
+  if(state.activeTab === "today") view.innerHTML = todayView();
+  if(state.activeTab === "chapters") view.innerHTML = chaptersView();
+  if(state.activeTab === "money") view.innerHTML = moneyView();
+  if(state.activeTab === "insights") view.innerHTML = insightsView();
+  if(state.activeTab === "refuge") view.innerHTML = refugeView();
   bind();
 }
-function renderHeader(title, sub=''){ return `<div class="top"><div><p class="eyebrow">LifeOS</p><h1 class="title">${title}</h1>${sub?`<p class="subtitle">${sub}</p>`:''}</div></div>`; }
-function renderToday(){ const [emoji,stage]=treeStage(); const [course,trend]=courseText(); const goals=todayGoals(); const fg=focusGoal();
-  return `${renderHeader('Heute','Dein tägliches Briefing.')}
-  <section class="card briefing"><p class="eyebrow">👋 Guten Morgen, Julius</p><h2 style="margin:0 0 8px">${course}</h2><p class="notice">${trend}</p><div class="tree-wrap"><div class="tree small">${emoji}</div><div class="muted">${stage} · Tag ${daysActive()}</div></div></section>
-  <section class="metric-grid"><div class="metric"><div class="label">🎯 Fokus heute</div><div class="value">${fg?escapeHtml(fg.title):'Nicht gesetzt'}</div></div><div class="metric"><div class="label">💰 Heute verfügbar</div><div class="value">${fmtEUR(availableToday())}</div></div></section>
-  <section class="card"><div class="row"><div><p class="eyebrow">💡 Heute wichtig</p><h3 style="margin:0">${insight()}</h3></div></div></section>
-  <section class="card"><p class="eyebrow">👉 Nächster Schritt</p><h2 style="margin:0 0 14px">${nextStep()}</h2><button class="btn" data-tabgo="goals">Zu den Zielen</button></section>
-  <section class="card"><div class="row"><div><p class="eyebrow">🎯 Ziele</p><h3 style="margin:0">${completedTodayGoals().length} von ${goals.length} erledigt</h3></div><div class="pill">${Math.round((goals.length?completedTodayGoals().length/goals.length:0)*100)}%</div></div><div class="progress"><div class="bar" style="width:${(goals.length?completedTodayGoals().length/goals.length:0)*100}%"></div></div></section>`;
+
+function todayView(){
+  const phase = timePhase();
+  const greeting = phase==="morning" ? "Guten Morgen" : phase==="evening" ? "Guten Abend" : "Heute";
+  const spent = spentThisMonth();
+  const available = Math.max(0, state.money.monthlyBudget - spent);
+  return `
+    <section class="header">
+      <div class="eyebrow">${new Date().toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}</div>
+      <h1>${greeting}, Julius</h1>
+      <div class="status">${statusLine()}</div>
+    </section>
+
+    <section class="card big-card solid">
+      <div class="label">Heute wichtig</div>
+      <div class="title">${todayImportant()}</div>
+      <p class="text">LifeOS zeigt dir nur das, was heute wirklich Aufmerksamkeit verdient.</p>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <div>
+          <div class="label">Aktuelles Kapitel</div>
+          <div class="title">${state.chapter ? state.chapter.title : "Noch kein Kapitel"}</div>
+          <p class="text">${state.chapter ? (state.chapter.why || "Dein aktueller Fokus.") : "Starte ein Kapitel, das dein Leben gerade prägen soll."}</p>
+        </div>
+        <button class="secondary" data-tab-go="chapters">Öffnen</button>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="label">Verfügbar</div>
+        <div class="metric">${euro(available)}</div>
+        <p class="small">Diesen Monat</p>
+      </div>
+      <div class="card">
+        <div class="label">Lebensbaum</div>
+        <div class="metric">${state.planted ? daysSince(state.createdAt) : "0"}</div>
+        <p class="small">Tage begleitet</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <button class="primary" id="openReflection">🌙 Wie war dein Tag?</button>
+    </section>
+  `;
 }
-function renderGoals(){ const daily=todayGoals(); const long=state.goals.filter(g=>g.type==='long');
- return `${renderHeader('Ziele','Heute entscheidet, was morgen wächst.')}
- <section class="card"><p class="eyebrow">➕ Neues Ziel</p><div class="form"><input id="goalTitle" class="input" placeholder="z. B. Sport, Lernen, Wohnung" maxlength="40"/><select id="goalArea" class="select">${Object.entries(AREAS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><div class="seg"><button class="goal-type active" data-type="daily">Tagesziel</button><button class="goal-type" data-type="long">Langfristig</button></div><button class="btn" id="addGoal">Ziel hinzufügen</button></div></section>
- <h2 class="section-title">🔥 Fokus heute</h2>${focusGoal()?goalItem(focusGoal()):'<div class="empty">Wähle bei einem Tagesziel den Stern, um es als Fokus zu setzen.</div>'}
- <h2 class="section-title">🎯 Heute</h2><div class="stack">${daily.length?daily.map(goalItem).join(''):'<div class="empty">Noch keine Tagesziele. Lege bis zu 5 an.</div>'}</div>
- <h2 class="section-title">📈 Langfristig</h2><div class="stack">${long.length?long.map(goalItem).join(''):'<div class="empty">Langfristige Ziele erscheinen hier.</div>'}</div>`;
+
+function chaptersView(){
+  return `
+    <section class="header">
+      <div class="eyebrow">Richtung</div>
+      <h1>Kapitel</h1>
+      <div class="status">🎯 Ein Kapitel gleichzeitig</div>
+    </section>
+
+    <section class="card solid">
+      <div class="label">Aktives Kapitel</div>
+      <div class="title">${state.chapter ? state.chapter.title : "Kein Kapitel aktiv"}</div>
+      <p class="text">${state.chapter ? (state.chapter.why || "Kein Warum hinterlegt.") : "Ein Kapitel ist kein To-do. Es ist eine Richtung für die nächsten Wochen."}</p>
+      ${state.chapter ? `<div class="progress" style="--w:${state.chapter.progress||10}%"><span></span></div>` : ""}
+      <br />
+      <button class="primary" id="newChapter">${state.chapter ? "Kapitel ändern" : "Kapitel starten"}</button>
+    </section>
+  `;
 }
-function goalItem(g){ const done = g.completedDate === todayISO(); return `<div class="goal ${done?'done':''}" data-id="${g.id}"><div class="goal-main"><button class="check toggleGoal">${done?'✓':'○'}</button><div><div class="goal-title">${escapeHtml(g.title)}</div><div class="meta">${AREAS[g.area]||g.area} ${g.isFocus?'· 🔥 Fokus':''}</div></div></div><div class="actions"><button class="icon-btn focusGoal">⭐</button><button class="icon-btn deleteGoal">🗑️</button></div></div>`; }
-function renderFinance(){ const ex=todayExpenses().slice().reverse();
- return `${renderHeader('Finanzen','Bewusstsein statt Kontrolle.')}
- <section class="card briefing"><p class="eyebrow">Heute verfügbar</p><h1 class="title">${fmtEUR(availableToday())}</h1><p class="subtitle">Monat: ${fmtEUR(spentMonth())} / ${fmtEUR(state.budget)}</p><div class="progress"><div class="bar" style="width:${Math.min(100,spentMonth()/state.budget*100)}%"></div></div></section>
- <section class="card"><p class="eyebrow">➕ Ausgabe erfassen</p><div class="form"><input id="expenseAmount" class="input" inputmode="decimal" placeholder="Betrag, z. B. 8,50"/><select id="expenseCategory" class="select">${Object.entries(CATEGORIES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><div class="seg"><button class="planned active" data-planned="false">Spontan</button><button class="planned" data-planned="true">Geplant</button></div><input id="expenseNote" class="input" placeholder="Notiz optional" maxlength="40"/><button class="btn" id="addExpense">Speichern</button></div></section>
- <section class="card"><p class="eyebrow">Monatsbudget ändern</p><div class="row"><input id="budgetInput" class="input" value="${state.budget}" inputmode="decimal"/><button class="icon-btn" id="saveBudget">✓</button></div></section>
- <h2 class="section-title">Letzte Ausgaben heute</h2><div class="stack">${ex.length?ex.map(expenseItem).join(''):'<div class="empty">Heute noch keine Ausgabe erfasst.</div>'}</div>`;
+
+function moneyView(){
+  const spent = spentThisMonth();
+  const available = Math.max(0, state.money.monthlyBudget - spent);
+  const last = state.money.expenses.slice(-5).reverse();
+  return `
+    <section class="header">
+      <div class="eyebrow">Ressourcen</div>
+      <h1>Finanzen</h1>
+      <div class="status">💰 Geld als Spiegel deiner Prioritäten</div>
+    </section>
+
+    <section class="grid">
+      <div class="card solid">
+        <div class="label">Monatsbudget</div>
+        <div class="metric">${euro(state.money.monthlyBudget)}</div>
+      </div>
+      <div class="card solid">
+        <div class="label">Verfügbar</div>
+        <div class="metric">${euro(available)}</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <button class="primary" id="addExpense">Ausgabe erfassen</button>
+      <br><br>
+      <button class="secondary" id="editBudget">Budget ändern</button>
+    </section>
+
+    <section class="card">
+      <div class="label">Letzte Ausgaben</div>
+      <div class="list">
+        ${last.length ? last.map(e=>`
+          <div class="item row">
+            <div>
+              <div class="item-title">${e.note || "Ausgabe"}</div>
+              <div class="small">${areaName(e.area)} · ${new Date(e.date).toLocaleDateString("de-DE")}</div>
+            </div>
+            <strong>${euro(e.amount)}</strong>
+          </div>`).join("") : `<p class="text">Noch keine Ausgaben erfasst.</p>`}
+      </div>
+    </section>
+  `;
 }
-function expenseItem(e){ return `<div class="expense" data-id="${e.id}"><div class="expense-main"><div style="font-size:24px">${(CATEGORIES[e.category]||'💸').split(' ')[0]}</div><div><div class="goal-title">${escapeHtml(e.note || (CATEGORIES[e.category]||e.category).replace(/^\S+\s/,''))}</div><div class="meta">${e.planned?'Geplant':'Spontan'} · ${new Date(e.createdAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</div></div></div><div class="row" style="gap:8px"><strong>${fmtEUR(e.amount)}</strong><button class="icon-btn deleteExpense">🗑️</button></div></div>`; }
-function renderJourney(){ const [emoji,stage]=treeStage(); const ms=milestones(); const goals=state.goals.length; const spontaneous=state.expenses.length?Math.round(state.expenses.filter(e=>!e.planned).length/state.expenses.length*100):0;
- return `${renderHeader('Reise','Dein Wachstum wird sichtbar.')}
- <section class="card briefing"><div class="tree-wrap"><div class="tree big">${emoji}</div><h2 style="margin:6px 0 0">Dein Lebensbaum</h2><p class="subtitle">${stage} · Tag ${daysActive()}</p></div></section>
- <section class="metric-grid"><div class="metric"><div class="label">🎯 Ziele</div><div class="value">${goals}</div></div><div class="metric"><div class="label">💰 Spontan</div><div class="value">${spontaneous}%</div></div></section>
- <h2 class="section-title">Meilensteine</h2><div class="stack">${ms.length?ms.map(m=>`<div class="milestone"><div><strong>${m.icon} ${m.title}</strong><div class="meta">Tag ${m.days}</div></div></div>`).join(''):'<div class="empty">Deine ersten Meilensteine entstehen bald.</div>'}</div>
- <section class="card"><p class="eyebrow">🧠 Erste Erkenntnis</p><h3 style="margin:0">${insight()}</h3><p class="subtitle">LifeOS bewertet nicht. Es macht sichtbar.</p></section>`;
+
+function insightsView(){
+  const obs = buildObservations();
+  return `
+    <section class="header">
+      <div class="eyebrow">Verständnis</div>
+      <h1>Erkenntnisse</h1>
+      <div class="status">🐦 Wenige, aber bedeutende Hinweise</div>
+    </section>
+    <section class="card solid">
+      <div class="label">Beobachtungen</div>
+      <div class="list">
+        ${obs.length ? obs.map(o=>`<div class="item">${o}</div>`).join("") : `<p class="text">Noch nicht genug Daten. Ein paar Reflexionen reichen, damit erste Beobachtungen entstehen.</p>`}
+      </div>
+    </section>
+  `;
 }
+
+function buildObservations(){
+  const out = [];
+  const last = state.reflections.slice(-14);
+  if(last.length >= 3) out.push(`🌙 Du hast ${last.length} Reflexionen gespeichert. Daraus entsteht langsam dein Muster.`);
+  const counts = {};
+  last.flatMap(r=>r.areas||[]).forEach(a=>counts[a]=(counts[a]||0)+1);
+  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+  if(top){
+    const a = areas.find(x=>x.id===top[0]);
+    out.push(`${a.icon} ${a.name} war zuletzt dein präsentester Lebensbereich.`);
+  }
+  return out;
+}
+
+function refugeView(){
+  const d = daysSince(state.createdAt);
+  const roots = rootStrength();
+  return `
+    <section class="header">
+      <div class="eyebrow">Dein Ort</div>
+      <h1>Refugium</h1>
+      <div class="status">🌳 ${state.planted ? `${d} Tage begleitet` : "Noch nicht gepflanzt"}</div>
+    </section>
+
+    ${state.planted ? `
+    <section class="tree-stage">
+      ${treeSvg()}
+    </section>
+
+    <section class="card roots-panel">
+      <div class="label">🌱 Fundament</div>
+      <p class="text">Deine Wurzeln entstehen aus Reflexionen, Kapiteln und Ressourcen.</p>
+      ${areas.map(a=>`
+        <div class="root-row">
+          <div>${a.icon} ${a.name}</div>
+          <div class="rootbar"><span style="width:${roots[a.id]}%"></span></div>
+        </div>
+      `).join("")}
+    </section>` : `
+    <section class="card solid">
+      <div class="title">🌱 Pflanze deinen Lebensbaum</div>
+      <p class="text">Heute beginnt dein persönliches Refugium.</p>
+      <br>
+      <button class="primary" id="plantTree">Baum pflanzen</button>
+    </section>`}
+  `;
+}
+
+function treeSvg(){
+  const refs = state.reflections.length;
+  const leaves = Math.min(30, 4 + refs * 2);
+  let leafEls = "";
+  const positions = [
+    [170,120],[210,110],[250,128],[145,155],[230,158],[280,165],[180,190],[255,205],
+    [125,205],[300,220],[160,245],[230,250],[275,260],[195,285],[140,290],[310,300],
+    [115,250],[335,260],[205,80],[265,95],[105,170],[335,185],[175,325],[250,330],
+    [210,215],[295,130],[145,105],[315,110],[225,300],[95,220]
+  ];
+  for(let i=0;i<leaves;i++){
+    const [x,y]=positions[i%positions.length];
+    leafEls += `<ellipse class="leaf" cx="${x}" cy="${y}" rx="18" ry="10" fill="#79a96f" opacity=".9" transform="rotate(${(i*37)%160} ${x} ${y})"/>`;
+  }
+  const bird = state.reflections.length >= 5 ? `<text class="bird" x="275" y="128" font-size="28">🐦</text>` : "";
+  return `
+  <svg class="tree-svg" viewBox="0 0 430 430" preserveAspectRatio="xMidYMid meet">
+    <path d="M70 370 C145 330, 285 330, 360 370" fill="none" stroke="#8aa879" stroke-width="18" stroke-linecap="round" opacity=".25"/>
+    <path d="M215 345 C205 280, 210 210, 215 145" fill="none" stroke="#8a5f3d" stroke-width="30" stroke-linecap="round"/>
+    <path d="M215 245 C170 215, 130 180, 102 140" fill="none" stroke="#8a5f3d" stroke-width="14" stroke-linecap="round"/>
+    <path d="M220 225 C265 205, 302 170, 335 125" fill="none" stroke="#8a5f3d" stroke-width="14" stroke-linecap="round"/>
+    <path d="M215 295 C170 285, 135 265, 95 235" fill="none" stroke="#8a5f3d" stroke-width="12" stroke-linecap="round"/>
+    <path d="M225 290 C280 292, 325 270, 365 240" fill="none" stroke="#8a5f3d" stroke-width="12" stroke-linecap="round"/>
+    ${leafEls}
+    ${bird}
+  </svg>`;
+}
+
+function rootStrength(){
+  const roots = Object.fromEntries(areas.map(a=>[a.id,8]));
+  state.reflections.forEach(r => (r.areas||[]).forEach(a => roots[a] = Math.min(100, roots[a]+8)));
+  if(state.chapter?.area) roots[state.chapter.area] = Math.min(100, roots[state.chapter.area]+20);
+  state.money.expenses.forEach(e => { if(e.area) roots[e.area] = Math.min(100, roots[e.area]+3); });
+  return roots;
+}
+
+function areaName(id){
+  const a = areas.find(x=>x.id===id);
+  return a ? `${a.icon} ${a.name}` : "Ohne Bereich";
+}
+
 function bind(){
-  document.querySelectorAll('[data-tabgo]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tabgo; render();});
-  const addGoal=document.getElementById('addGoal'); if(addGoal) addGoal.onclick=()=>{ const title=document.getElementById('goalTitle').value.trim(); if(!title) return; if(state.goalType==='daily' && todayGoals().length>=5) return alert('Maximal 5 Tagesziele.'); state.goals.push({id:String(Date.now()), title, area:document.getElementById('goalArea').value, type:state.goalType, isFocus:false, createdAt:new Date().toISOString(), completedDate:null}); save(); render(); };
-  document.querySelectorAll('.goal-type').forEach(b=>b.onclick=()=>{state.goalType=b.dataset.type; document.querySelectorAll('.goal-type').forEach(x=>x.classList.toggle('active',x===b));});
-  document.querySelectorAll('.toggleGoal').forEach(b=>b.onclick=()=>{ const id=b.closest('.goal').dataset.id; const g=state.goals.find(x=>x.id===id); g.completedDate = g.completedDate===todayISO()?null:todayISO(); save(); render(); });
-  document.querySelectorAll('.deleteGoal').forEach(b=>b.onclick=()=>{ const id=b.closest('.goal').dataset.id; state.goals=state.goals.filter(x=>x.id!==id); save(); render(); });
-  document.querySelectorAll('.focusGoal').forEach(b=>b.onclick=()=>{ const id=b.closest('.goal').dataset.id; const g=state.goals.find(x=>x.id===id); if(g.type!=='daily') return alert('Nur Tagesziele können Fokusziel sein.'); state.goals.forEach(x=>x.isFocus=false); g.isFocus=true; save(); render(); });
-  document.querySelectorAll('.planned').forEach(b=>b.onclick=()=>{state.plannedExpense=b.dataset.planned==='true'; document.querySelectorAll('.planned').forEach(x=>x.classList.toggle('active',x===b));});
-  const addExpense=document.getElementById('addExpense'); if(addExpense) addExpense.onclick=()=>{ const raw=document.getElementById('expenseAmount').value.replace(',','.'); const amount=Number(raw); if(!amount||amount<=0) return; state.expenses.push({id:String(Date.now()), amount, category:document.getElementById('expenseCategory').value, planned:state.plannedExpense, note:document.getElementById('expenseNote').value.trim(), createdAt:new Date().toISOString()}); save(); render(); };
-  document.querySelectorAll('.deleteExpense').forEach(b=>b.onclick=()=>{ const id=b.closest('.expense').dataset.id; state.expenses=state.expenses.filter(x=>x.id!==id); save(); render(); });
-  const saveBudget=document.getElementById('saveBudget'); if(saveBudget) saveBudget.onclick=()=>{ const v=Number(document.getElementById('budgetInput').value.replace(',','.')); if(v>0){state.budget=v; save(); render();} };
+  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  document.querySelectorAll("[data-tab-go]").forEach(b=>b.onclick=()=>switchTab(b.dataset.tabGo));
+  $("#openReflection")?.addEventListener("click", openReflection);
+  $("#newChapter")?.addEventListener("click", openChapter);
+  $("#plantTree")?.addEventListener("click", ()=>{ state.planted=true; save(); render(); });
+  $("#addExpense")?.addEventListener("click", openExpense);
+  $("#editBudget")?.addEventListener("click", openBudget);
 }
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ state.tab=b.dataset.tab; render(); });
+
+function showModal(html){
+  const m = $("#modal");
+  m.classList.remove("hidden");
+  m.innerHTML = `<div class="sheet">${html}<br><button class="secondary" id="closeModal">Schließen</button></div>`;
+  $("#closeModal").onclick = closeModal;
+}
+function closeModal(){ $("#modal").classList.add("hidden"); $("#modal").innerHTML=""; }
+
+function openReflection(){
+  showModal(`
+    <h2>🌙 Wie war dein Tag?</h2>
+    <div class="emoji-options">
+      <button data-mood="good">😀</button>
+      <button data-mood="ok">😐</button>
+      <button data-mood="hard">☹️</button>
+    </div>
+    <div id="reflectionStep"></div>
+  `);
+  document.querySelectorAll("[data-mood]").forEach(b=>b.onclick=()=>reflectionAreas(b.dataset.mood));
+}
+function reflectionAreas(mood){
+  $("#reflectionStep").innerHTML = `
+    <div class="label">Was hat deinen Tag geprägt?</div>
+    <div class="area-options">
+      ${areas.map(a=>`<label><input type="checkbox" value="${a.id}"> ${a.icon} ${a.name}</label>`).join("")}
+    </div>
+    <textarea id="reflectionNote" placeholder="Was bleibt von diesem Tag? (optional)"></textarea>
+    <br><br>
+    <button class="primary" id="saveReflection">Reflexion speichern</button>
+  `;
+  $("#saveReflection").onclick = () => {
+    const selected = [...document.querySelectorAll("#reflectionStep input:checked")].map(i=>i.value);
+    state.reflections.push({ date:new Date().toISOString(), mood, areas:selected, note:$("#reflectionNote").value.trim() });
+    if(!state.planted) state.planted = true;
+    save(); closeModal(); render();
+  };
+}
+
+function openChapter(){
+  showModal(`
+    <h2>🎯 Neues Kapitel</h2>
+    <p class="text">Welcher Bereich verdient in den nächsten Wochen Aufmerksamkeit?</p><br>
+    <select id="chapterArea">${areas.map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join("")}</select><br><br>
+    <input class="input" id="chapterTitle" placeholder="z. B. Wieder fit werden" value="${state.chapter?.title||""}"><br><br>
+    <textarea id="chapterWhy" placeholder="Warum ist dir das wichtig?">${state.chapter?.why||""}</textarea><br><br>
+    <button class="primary" id="saveChapter">Kapitel starten</button>
+  `);
+  $("#saveChapter").onclick = () => {
+    state.chapter = {
+      title: $("#chapterTitle").value.trim() || "Neues Kapitel",
+      why: $("#chapterWhy").value.trim(),
+      area: $("#chapterArea").value,
+      progress: state.chapter?.progress || 10,
+      startedAt: new Date().toISOString()
+    };
+    save(); closeModal(); render();
+  };
+}
+
+function openExpense(){
+  showModal(`
+    <h2>💰 Ausgabe erfassen</h2>
+    <input class="input" id="expenseAmount" type="number" step="0.01" placeholder="Betrag"><br><br>
+    <input class="input" id="expenseNote" placeholder="Notiz, z. B. Essen"><br><br>
+    <select id="expenseArea">${areas.map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join("")}</select><br><br>
+    <button class="primary" id="saveExpense">Speichern</button>
+  `);
+  $("#saveExpense").onclick = () => {
+    state.money.expenses.push({
+      amount: Number($("#expenseAmount").value || 0),
+      note: $("#expenseNote").value.trim(),
+      area: $("#expenseArea").value,
+      date: new Date().toISOString()
+    });
+    save(); closeModal(); render();
+  };
+}
+
+function openBudget(){
+  showModal(`
+    <h2>Budget ändern</h2>
+    <input class="input" id="budgetAmount" type="number" value="${state.money.monthlyBudget}"><br><br>
+    <button class="primary" id="saveBudget">Speichern</button>
+  `);
+  $("#saveBudget").onclick = () => {
+    state.money.monthlyBudget = Number($("#budgetAmount").value || 0);
+    save(); closeModal(); render();
+  };
+}
+
 render();

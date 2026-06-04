@@ -1,22 +1,28 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#121512" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>LifeOS</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="stylesheet" href="style.css" />
+  <meta name="theme-color" content="#dfeee2" />
 </head>
 <body>
-  <main id="app" class="app-shell"></main>
-  <nav class="tabbar" aria-label="Navigation">
-    <button class="tab active" data-tab="today">🌳<span>Heute</span></button>
-    <button class="tab" data-tab="goals">🎯<span>Ziele</span></button>
-    <button class="tab" data-tab="finance">💰<span>Finanzen</span></button>
-    <button class="tab" data-tab="journey">📖<span>Reise</span></button>
-  </nav>
+  <div class="app">
+    <main id="view"></main>
+
+    <nav class="tabbar">
+      <button class="tab active" data-tab="today">🌅<span>Heute</span></button>
+      <button class="tab" data-tab="chapters">🎯<span>Kapitel</span></button>
+      <button class="tab" data-tab="money">💰<span>Finanzen</span></button>
+      <button class="tab" data-tab="insights">🐦<span>Erkenntnisse</span></button>
+      <button class="tab" data-tab="refuge">🌳<span>Refugium</span></button>
+    </nav>
+  </div>
+
+  <div id="modal" class="modal hidden"></div>
+
   <script src="app.js"></script>
 </body>
 </html>
