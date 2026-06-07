@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d10" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="yxngzen" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>yxngzen</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d10;
+        --panel: #171b20;
+        --panel-strong: #1f252c;
+        --text: #f4f6f8;
+        --muted: #a9b0b8;
+        --line: #303741;
+        --accent: #4ad66d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, rgba(74, 214, 109, 0.13), transparent 34rem),
+          linear-gradient(180deg, #101318 0%, var(--bg) 42%);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      .app-shell {
+        width: min(100%, 520px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 28px);
+      }
+
+      .topbar,
+      .section-heading,
+      .focus-strip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .topbar {
+        margin-bottom: 18px;
+      }
+
+      .kicker,
+      .label,
+      .section-heading span,
+      label {
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.25;
+      }
+
+      .kicker,
+      .label {
+        margin: 0 0 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 2.2rem;
+        line-height: 0.95;
+      }
+
+      h2 {
+        font-size: 1.04rem;
+      }
+
+      .icon-button,
+      .primary-button,
+      .secondary-button,
+      .category-card {
+        border: 1px solid var(--line);
+        color: var(--text);
+        background: var(--panel);
+      }
+
+      .icon-button {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 1.15rem;
+      }
+
+      .focus-strip {
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(23, 27, 32, 0.82);
+        backdrop-filter: blur(18px);
+      }
+
+      .focus-strip > div {
+        min-width: 0;
+      }
+
+      .focus-strip strong {
+        display: block;
+        max-width: 9ch;
+        overflow: hidden;
+        font-size: 1.03rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .section-block {
+        margin-top: 20px;
+      }
+
+      .section-heading {
+        margin-bottom: 10px;
+      }
+
+      .category-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .category-card {
+        min-height: 128px;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: left;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .category-card.active {
+        border-color: var(--accent);
+        background: var(--panel-strong);
+      }
+
+      .category-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        background: var(--card-color);
+      }
+
+      .category-card h3 {
+        margin: 0 0 16px;
+        font-size: 0.98rem;
+      }
+
+      .category-card .score {
+        font-size: 1.55rem;
+        font-weight: 760;
+      }
+
+      .category-card .mini {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.35;
+      }
+
+      .detail-panel,
+      .review-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 14px;
+      }
+
+      .meter-row {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .meter {
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #2a3038;
+      }
+
+      .meter span {
+        display: block;
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--accent);
+        transition: width 180ms ease;
+      }
+
+      .tracker-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+      }
+
+      .wide,
+      .primary-button,
+      .review-panel label,
+      .secondary-button {
+        grid-column: 1 / -1;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        border: 1px solid #39424d;
+        border-radius: 8px;
+        background: var(--panel-strong);
+        color: var(--text);
+        outline: none;
+        padding: 11px 12px;
+      }
+
+      textarea {
+        resize: vertical;
+      }
+
+      input:focus,
+      textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+      }
+
+      .primary-button,
+      .secondary-button {
+        min-height: 46px;
+        border-radius: 8px;
+        font-weight: 760;
+      }
+
+      .primary-button {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #06100b;
+      }
+
+      .secondary-button {
+        background: var(--panel-strong);
+      }
+
+      .review-panel {
+        display: grid;
+        gap: 12px;
+      }
+
+      @media (max-width: 370px) {
+        .focus-strip {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .category-grid,
+        .tracker-form,
+        .meter-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="kicker">Personal dashboard</p>
+          <h1>yxngzen</h1>
+        </div>
+        <button class="icon-button" id="resetButton" type="button" aria-label="Daten zuruecksetzen" title="Daten zuruecksetzen">
+          <span aria-hidden="true">&#8635;</span>
+        </button>
+      </header>
+
+      <section class="focus-strip" aria-label="Wochenuebersicht">
+        <div>
+          <p class="label">Life balance</p>
+          <strong id="balanceScore">0%</strong>
+        </div>
+        <div>
+          <p class="label">Diese Woche</p>
+          <strong id="weeklyHours">0h</strong>
+        </div>
+        <div>
+          <p class="label">Naechster Fokus</p>
+          <strong id="focusArea">Sport</strong>
+        </div>
+      </section>
+
+      <section class="section-block" aria-label="Bereiche">
+        <div class="section-heading">
+          <h2>Core Five</h2>
+          <span id="todayLabel"></span>
+        </div>
+        <div class="category-grid" id="categoryGrid"></div>
+      </section>
+
+      <section class="section-block" aria-label="Aktiver Bereich">
+        <div class="section-heading">
+          <h2 id="activeTitle">Sport</h2>
+          <span id="activeStatus">bereit</span>
+        </div>
+
+        <div class="detail-panel">
+          <div class="meter-row">
+            <div>
+              <p class="label">Wochenziel</p>
+              <strong><span id="currentHours">0</span>/<span id="targetHours">0</span>h</strong>
+            </div>
+            <div class="meter">
+              <span id="progressBar"></span>
+            </div>
+          </div>
+
+          <form class="tracker-form" id="trackerForm">
+            <label>
+              Stunden diese Woche
+              <input id="hoursInput" type="number" min="0" max="80" step="0.5" inputmode="decimal" />
+            </label>
+            <label>
+              Ziel pro Woche
+              <input id="targetInput" type="number" min="1" max="80" step="0.5" inputmode="decimal" />
+            </label>
+            <label class="wide">
+              Wichtigstes Ziel
+              <input id="goalInput" type="text" maxlength="80" />
+            </label>
+            <label class="wide">
+              Letzter Fortschritt
+              <textarea id="noteInput" maxlength="180" rows="3"></textarea>
+            </label>
+            <button class="primary-button" type="submit">Speichern</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="section-block" aria-label="Wochenreview">
+        <div class="section-heading">
+          <h2>Review</h2>
+          <span>woechentlich</span>
+        </div>
+        <div class="review-panel">
+          <label>
+            Was lief gut?
+            <textarea id="winsInput" maxlength="220" rows="3"></textarea>
+          </label>
+          <label>
+            Was braucht mehr Energie?
+            <textarea id="needsInput" maxlength="220" rows="3"></textarea>
+          </label>
+          <button class="secondary-button" id="reviewButton" type="button">Review speichern</button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const STORAGE_KEY = "yxngzen.life.v1";
+
+      const categories = [
+        {
+          id: "sport",
+          name: "Sport",
+          color: "#4ad66d",
+          hours: 3,
+          target: 5,
+          goal: "3 Trainings + 1 Mobility Session",
+          note: "Diese Woche wieder Rhythmus aufbauen."
+        },
+        {
+          id: "musik",
+          name: "Musik",
+          color: "#64b5ff",
+          hours: 1.5,
+          target: 4,
+          goal: "2 Songideen oder Beats skizzieren",
+          note: "Kurze Sessions zaehlen auch."
+        },
+        {
+          id: "fashion",
+          name: "Fashion",
+          color: "#ff7aa8",
+          hours: 1,
+          target: 2,
+          goal: "Outfits dokumentieren und Looks sammeln",
+          note: "Ein gutes Outfit bewusst festhalten."
+        },
+        {
+          id: "design",
+          name: "App Design",
+          color: "#f3c969",
+          hours: 2,
+          target: 5,
+          goal: "1 UI Screen pro Woche bauen",
+          note: "Saubere Komponenten statt nur Ideen."
+        },
+        {
+          id: "finanzen",
+          name: "Finanzen",
+          color: "#8be0d4",
+          hours: 0.5,
+          target: 2,
+          goal: "Budget pruefen und Sparziel tracken",
+          note: "Einmal pro Woche bewusst reinschauen."
+        }
+      ];
+
+      const defaultState = {
+        activeId: "sport",
+        review: {
+          wins: "",
+          needs: ""
+        },
+        categories
+      };
+
+      let state = loadState();
+
+      const els = {
+        balanceScore: document.querySelector("#balanceScore"),
+        weeklyHours: document.querySelector("#weeklyHours"),
+        focusArea: document.querySelector("#focusArea"),
+        todayLabel: document.querySelector("#todayLabel"),
+        categoryGrid: document.querySelector("#categoryGrid"),
+        activeTitle: document.querySelector("#activeTitle"),
+        activeStatus: document.querySelector("#activeStatus"),
+        currentHours: document.querySelector("#currentHours"),
+        targetHours: document.querySelector("#targetHours"),
+        progressBar: document.querySelector("#progressBar"),
+        hoursInput: document.querySelector("#hoursInput"),
+        targetInput: document.querySelector("#targetInput"),
+        goalInput: document.querySelector("#goalInput"),
+        noteInput: document.querySelector("#noteInput"),
+        trackerForm: document.querySelector("#trackerForm"),
+        winsInput: document.querySelector("#winsInput"),
+        needsInput: document.querySelector("#needsInput"),
+        reviewButton: document.querySelector("#reviewButton"),
+        resetButton: document.querySelector("#resetButton")
+      };
+
+      function loadState() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return clone(defaultState);
+
+        try {
+          const parsed = JSON.parse(saved);
+          return {
+            ...clone(defaultState),
+            ...parsed,
+            categories: categories.map((category) => ({
+              ...category,
+              ...(parsed.categories || []).find((item) => item.id === category.id)
+            }))
+          };
+        } catch {
+          return clone(defaultState);
+        }
+      }
+
+      function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function saveState() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+
+      function scoreFor(category) {
+        return Math.min(100, Math.round((Number(category.hours) / Number(category.target)) * 100));
+      }
+
+      function activeCategory() {
+        return state.categories.find((category) => category.id === state.activeId) || state.categories[0];
+      }
+
+      function weakestCategory() {
+        return [...state.categories].sort((a, b) => scoreFor(a) - scoreFor(b))[0];
+      }
+
+      function formatHours(value) {
+        return Number(value).toLocaleString("de-DE", { maximumFractionDigits: 1 });
+      }
+
+      function statusText(score) {
+        if (score >= 90) return "stark";
+        if (score >= 60) return "solide";
+        return "braucht Fokus";
+      }
+
+      function render() {
+        const totalHours = state.categories.reduce((sum, category) => sum + Number(category.hours), 0);
+        const averageScore = Math.round(
+          state.categories.reduce((sum, category) => sum + scoreFor(category), 0) / state.categories.length
+        );
+        const focus = weakestCategory();
+        const active = activeCategory();
+        const activeScore = scoreFor(active);
+
+        document.documentElement.style.setProperty("--accent", active.color);
+        els.balanceScore.textContent = `${averageScore}%`;
+        els.weeklyHours.textContent = `${formatHours(totalHours)}h`;
+        els.focusArea.textContent = focus.name;
+        els.todayLabel.textContent = new Intl.DateTimeFormat("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" }).format(new Date());
+
+        els.categoryGrid.innerHTML = "";
+        state.categories.forEach((category) => {
+          const score = scoreFor(category);
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = `category-card${category.id === state.activeId ? " active" : ""}`;
+          card.style.setProperty("--card-color", category.color);
+          card.innerHTML = `
+            <h3>${category.name}</h3>
+            <div class="score">${score}%</div>
+            <p class="mini">${formatHours(category.hours)} von ${formatHours(category.target)}h - ${statusText(score)}</p>
+          `;
+          card.addEventListener("click", () => {
+            state.activeId = category.id;
+            saveState();
+            render();
+          });
+          els.categoryGrid.append(card);
+        });
+
+        els.activeTitle.textContent = active.name;
+        els.activeStatus.textContent = statusText(activeScore);
+        els.currentHours.textContent = formatHours(active.hours);
+        els.targetHours.textContent = formatHours(active.target);
+        els.progressBar.style.width = `${activeScore}%`;
+        els.hoursInput.value = active.hours;
+        els.targetInput.value = active.target;
+        els.goalInput.value = active.goal;
+        els.noteInput.value = active.note;
+        els.winsInput.value = state.review.wins;
+        els.needsInput.value = state.review.needs;
+      }
+
+      els.trackerForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const active = activeCategory();
+        active.hours = Math.max(0, Number(els.hoursInput.value || 0));
+        active.target = Math.max(1, Number(els.targetInput.value || 1));
+        active.goal = els.goalInput.value.trim();
+        active.note = els.noteInput.value.trim();
+        saveState();
+        render();
+      });
+
+      els.reviewButton.addEventListener("click", () => {
+        state.review.wins = els.winsInput.value.trim();
+        state.review.needs = els.needsInput.value.trim();
+        saveState();
+        els.reviewButton.textContent = "Gespeichert";
+        window.setTimeout(() => {
+          els.reviewButton.textContent = "Review speichern";
+        }, 900);
+      });
+
+      els.resetButton.addEventListener("click", () => {
+        state = clone(defaultState);
+        saveState();
+        render();
+      });
+
+      render();
+    </script>
+  </body>
+</html>
